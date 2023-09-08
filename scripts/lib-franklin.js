@@ -9,68 +9,117 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+const rumHandler = {
+  defers: {},
+  defercalls: [],
+  get(target, prop) {
+    if (prop === 'always') {
+      target.loadEnhancer();
+    }
+    // eslint-disable-next-line no-prototype-builtins
+    if (target.hasOwnProperty(prop)) {
+      return target[prop];
+    }
+    if (this.defers[prop]) {
+      return this.defers[prop];
+    }
+    if (prop === 'drain') {
+      return (...args) => this.drain(target, args[0], args[1]);
+    }
+    this.defers[prop] = (...deferargs) => {
+      this.defercalls.push([prop, deferargs]);
+    };
+    return this.defers[prop];
+  },
+  set(target, prop, value) {
+    const ret = Reflect.set(target, prop, value);
+    if (typeof value === 'function') {
+      this.drain(target, prop);
+    }
+    return ret;
+  },
+
+  drain(target, fnname) {
+    this.defercalls
+      .map((defercall) => ({ name: defercall[0], callargs: defercall[1] }))
+      .filter(({ name }) => name === fnname)
+      .forEach(({ name, callargs }) => target[name](...callargs));
+  },
+};
 
 /**
  * log RUM if part of the sample.
  * @param {string} checkpoint identifies the checkpoint in funnel
  * @param {Object} data additional data for RUM sample
+ * @param {string} data.source DOM node that is the source of a checkpoint event,
+ * identified by #id or .classname
+ * @param {string} data.target subject of the checkpoint event,
+ * for instance the href of a link, or a search term
  */
-export function sampleRUM(checkpoint, data = {}) {
-  sampleRUM.defer = sampleRUM.defer || [];
-  const defer = (fnname) => {
-    sampleRUM[fnname] = sampleRUM[fnname]
-      || ((...args) => sampleRUM.defer.push({ fnname, args }));
+// eslint-disable-next-line no-use-before-define
+export const sampleRUM = new Proxy(internalSampleRUM, rumHandler);
+
+function internalSampleRUM(checkpoint, data = {}) {
+  internalSampleRUM.always = internalSampleRUM.always || [];
+  internalSampleRUM.always.on = (chkpnt, fn) => {
+    internalSampleRUM.always[chkpnt] = fn;
   };
-  sampleRUM.drain = sampleRUM.drain
-    || ((dfnname, fn) => {
-      sampleRUM[dfnname] = fn;
-      sampleRUM.defer
-        .filter(({ fnname }) => dfnname === fnname)
-        .forEach(({ fnname, args }) => sampleRUM[fnname](...args));
-    });
-  sampleRUM.always = sampleRUM.always || [];
-  sampleRUM.always.on = (chkpnt, fn) => { sampleRUM.always[chkpnt] = fn; };
-  sampleRUM.on = (chkpnt, fn) => { sampleRUM.cases[chkpnt] = fn; };
-  defer('observe');
-  defer('cwv');
+  internalSampleRUM.on = (chkpnt, fn) => {
+    internalSampleRUM.cases[chkpnt] = fn;
+  };
+  internalSampleRUM.loadEnhancer = () => {
+    if (internalSampleRUM.enhancerLoaded) {
+      return false;
+    }
+    internalSampleRUM.enhancerLoaded = true;
+    // use classic script to avoid CORS issues
+    const script = document.createElement('script');
+    script.src = '/scripts/rum-enhancer.js';
+    document.head.appendChild(script);
+    return true;
+  };
+
   try {
     window.hlx = window.hlx || {};
     if (!window.hlx.rum) {
       const usp = new URLSearchParams(window.location.search);
       const weight = (usp.get('rum') === 'on') ? 1 : 100; // with parameter, weight is 1. Defaults to 100.
-      // eslint-disable-next-line no-bitwise
-      const hashCode = (s) => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
-      const id = `${hashCode(window.location.href)}-${new Date().getTime()}-${Math.random().toString(16).substr(2, 14)}`;
+      const id = Array.from({ length: 75 }, (_, i) => String.fromCharCode(48 + i)).filter((a) => /\d|[A-Z]/i.test(a)).filter(() => Math.random() * 75 > 70).join('');
       const random = Math.random();
       const isSelected = (random * weight < 1);
-      // eslint-disable-next-line object-curly-newline
-      window.hlx.rum = { weight, id, random, isSelected, sampleRUM };
+      const firstReadTime = Date.now();
+      const urlSanitizers = {
+        full: () => window.location.href,
+        origin: () => window.location.origin,
+        path: () => window.location.href.replace(/\?.*$/, ''),
+      };
+      // eslint-disable-next-line object-curly-newline, max-len
+      window.hlx.rum = { weight, id, random, isSelected, firstReadTime, sampleRUM, sanitizeURL: urlSanitizers[window.hlx.RUM_MASK_URL || 'path'] };
     }
-    const { weight, id } = window.hlx.rum;
+    const { weight, id, firstReadTime } = window.hlx.rum;
     if (window.hlx && window.hlx.rum && window.hlx.rum.isSelected) {
+      const knownProperties = ['weight', 'id', 'referer', 'checkpoint', 't', 'source', 'target', 'cwv'];
       const sendPing = (pdata = data) => {
         // eslint-disable-next-line object-curly-newline, max-len, no-use-before-define
-        const body = JSON.stringify({ weight, id, referer: window.location.href, generation: window.hlx.RUM_GENERATION, checkpoint, ...data });
+        const body = JSON.stringify({ weight, id, referer: window.hlx.rum.sanitizeURL(), checkpoint, t: (Date.now() - firstReadTime), ...data }, knownProperties);
         const url = `https://rum.hlx.page/.rum/${weight}`;
         // eslint-disable-next-line no-unused-expressions
         navigator.sendBeacon(url, body);
         // eslint-disable-next-line no-console
         console.debug(`ping:${checkpoint}`, pdata);
       };
-      sampleRUM.cases = sampleRUM.cases || {
+      internalSampleRUM.cases = internalSampleRUM.cases || {
         cwv: () => sampleRUM.cwv(data) || true,
-        lazy: () => {
-          // use classic script to avoid CORS issues
-          const script = document.createElement('script');
-          script.src = 'https://rum.hlx.page/.rum/@adobe/helix-rum-enhancer@^1/src/index.js';
-          document.head.appendChild(script);
-          return true;
-        },
+        lazy: () => internalSampleRUM.loadEnhancer(),
       };
       sendPing(data);
-      if (sampleRUM.cases[checkpoint]) { sampleRUM.cases[checkpoint](); }
+      if (internalSampleRUM.cases[checkpoint]) {
+        internalSampleRUM.cases[checkpoint]();
+      }
     }
-    if (sampleRUM.always[checkpoint]) { sampleRUM.always[checkpoint](data); }
+    if (internalSampleRUM.always[checkpoint]) {
+      internalSampleRUM.always[checkpoint](data);
+    }
   } catch (error) {
     // something went wrong
   }
