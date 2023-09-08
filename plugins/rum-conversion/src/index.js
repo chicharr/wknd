@@ -18,7 +18,7 @@ const { sampleRUM } = window.hlx.rum;
 * listenTo supports 'submit' and 'click'.
 * If listenTo is not provided, the information is used to track a conversion event.
 */
-sampleRUM.drain('convert', (cevent, cvalueThunk, element, listenTo = []) => {
+sampleRUM.convert = (cevent, cvalueThunk, element, listenTo = []) => {
   async function trackConversion(celement) {
     const MAX_SESSION_LENGTH = 1000 * 60 * 60 * 24 * 30; // 30 days
     try {
@@ -65,7 +65,7 @@ sampleRUM.drain('convert', (cevent, cvalueThunk, element, listenTo = []) => {
   } else {
     trackConversion(element, cevent, cvalueThunk);
   }
-});
+}
 
 /**
  * Returns the label used for tracking link clicks

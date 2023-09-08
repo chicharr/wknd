@@ -1,4 +1,4 @@
-import { analyticsTrackFormSubmission } from '../../scripts/analytics/lib-analytics.js';
+//import { analyticsTrackFormSubmission } from '../../scripts/analytics/lib-analytics.js';
 
 function createSelect(fd) {
   const select = document.createElement('select');
@@ -58,7 +58,7 @@ function createButton(fd, form = '') {
         event.preventDefault();
         button.setAttribute('disabled', '');
         await submitForm(form);
-        await analyticsTrackFormSubmission(form);
+        // await analyticsTrackFormSubmission(form);
         const redirectTo = fd.Extra;
         window.location.href = redirectTo;
       }
