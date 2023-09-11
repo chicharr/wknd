@@ -12,7 +12,7 @@ import {
   waitForLCP,
   loadBlocks,
   loadCSS,
-  toClassName,
+  toCamelCase,
 } from './lib-franklin.js';
 
 import { loadMartechDelayed, loadMartechLazy } from './neutrino.js';
@@ -256,6 +256,7 @@ async function loadLazy(doc) {
   // eslint-disable-next-line import/no-relative-packages
   const { initConversionTracking } = await import('../plugins/rum-conversion/src/index.js');
   await initConversionTracking.call(context, document);
+  await loadMartechLazy({sampleRUM, toCamelCase});
 }
 
 /**
@@ -271,9 +272,8 @@ function loadDelayed() {
 async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
-  loadMartechLazy({sampleRUM, toClassName});
+
   loadDelayed();
-  loadMartechDelayed({sampleRUM, toClassName});
 }
 
 loadPage();

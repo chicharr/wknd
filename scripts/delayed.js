@@ -1,7 +1,8 @@
 // eslint-disable-next-line import/no-cycle
-import { fetchPlaceholders, sampleRUM } from './lib-franklin.js';
+import { fetchPlaceholders, toCamelCase, sampleRUM } from './lib-franklin.js';
 import loadCookieConsent from './cookie-consent/lib-cookie-consent.js';
 import { analyticsSetConsent } from './analytics/lib-analytics.js';
+import { loadMartechDelayed } from './neutrino.js';
 
 // Core Web Vitals RUM collection
 sampleRUM('cwv');
@@ -19,3 +20,5 @@ const analyticsConsent = localStorage.getItem('consent_status_ANALYTICS');
 if (analyticsConsent) {
   await analyticsSetConsent(analyticsConsent === 'ALLOW');
 }
+
+await loadMartechDelayed({sampleRUM, toCamelCase});
