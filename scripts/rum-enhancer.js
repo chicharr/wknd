@@ -125,7 +125,7 @@ document.addEventListener('click', (event) => {
 // Track form submissions
 document.querySelectorAll('form').forEach((form) => {
   form.addEventListener('submit', (event) => {
-    sampleRUM('formsubmit', { target: sampleRUM.targetselector(event.target), source: sampleRUM.sourceselector(event.target) });
+    sampleRUM('formsubmit', { target: sampleRUM.targetselector(event.target), source: sampleRUM.sourceselector(event.target), element: form });
   });
 });
 

@@ -32,9 +32,9 @@ export default async function initMartech (config) {
   });
 
   // Listen to changes in consent
-  sampleRUM.always.on('consent', ( consents ) => {
-    if (consents) {
-      analyticsSetConsent(consents.ANALYTICS === 'ALLOW');
+  sampleRUM.always.on('consent', ( {target} ) => {
+    if (target) {
+      analyticsSetConsent(target.ANALYTICS === 'ALLOW');
     }
   });
 
@@ -46,6 +46,7 @@ export default async function initMartech (config) {
 
   sampleRUM.always.on('404', analyticsTrack404);
   sampleRUM.always.on('error', analyticsTrackError);
+  sampleRUM.always.on('formsubmit', ({element}) => analyticsTrackFormSubmission(element));
 
   // Declare conversionEvent, bufferTimeoutId and tempConversionEvent,
   // outside the convert function to persist them for buffering between
