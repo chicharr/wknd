@@ -17,7 +17,7 @@ export default async function initMartech (config) {
   const { sampleRUM,
          schemaNamespace,
          edgeConfigId,
-         imsOrgId} = config;
+         imsOrgId } = config;
 
   CUSTOM_SCHEMA_NAMESPACE = schemaNamespace || CUSTOM_SCHEMA_NAMESPACE;
   initAnalyticsTrackingQueue();

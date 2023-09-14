@@ -3,7 +3,7 @@ import { fetchPlaceholders, toCamelCase, sampleRUM } from './lib-franklin.js';
 import { loadMartechDelayed } from './neutrino.js';
 
 // Core Web Vitals RUM collection
-sampleRUM('cwv');
+sampleRUM.cwv();
 
 // add more delayed functionality here
 
