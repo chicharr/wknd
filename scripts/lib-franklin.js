@@ -24,7 +24,7 @@ const rumHandler = {
       return this.defers[prop];
     }
     if (prop === 'drain') {
-      return (...args) => this.drain(target, args[0], args[1]);
+      return (...args) => this.set(target, args[0], args[1]);
     }
     this.defers[prop] = (...deferargs) => {
       this.defercalls.push([prop, deferargs]);
@@ -60,6 +60,7 @@ const rumHandler = {
 export const sampleRUM = new Proxy(internalSampleRUM, rumHandler);
 
 function internalSampleRUM(checkpoint, data = {}) {
+  internalSampleRUM.baseURL = internalSampleRUM.baseURL || new URL(window.RUM_BASE == null ? 'https://rum.hlx.page' : window.RUM_BASE, window.location);
   internalSampleRUM.always = internalSampleRUM.always || [];
   internalSampleRUM.always.on = (chkpnt, fn) => {
     internalSampleRUM.always[chkpnt] = fn;
@@ -74,7 +75,7 @@ function internalSampleRUM(checkpoint, data = {}) {
     internalSampleRUM.enhancerLoaded = true;
     // use classic script to avoid CORS issues
     const script = document.createElement('script');
-    script.src = '/scripts/rum-enhancer.js';
+    script.src = new URL('.rum/@adobe/helix-rum-enhancer@^1/src/index.js', internalSampleRUM.baseURL).href;
     document.head.appendChild(script);
     return true;
   };
@@ -102,7 +103,7 @@ function internalSampleRUM(checkpoint, data = {}) {
       const sendPing = (pdata = data) => {
         // eslint-disable-next-line object-curly-newline, max-len, no-use-before-define
         const body = JSON.stringify({ weight, id, referer: window.hlx.rum.sanitizeURL(), checkpoint, t: (Date.now() - firstReadTime), ...data }, knownProperties);
-        const url = `https://rum.hlx.page/.rum/${weight}`;
+        const url = new URL(`.rum/${weight}`, internalSampleRUM.baseURL).href;
         // eslint-disable-next-line no-unused-expressions
         navigator.sendBeacon(url, body);
         // eslint-disable-next-line no-console
@@ -144,6 +145,31 @@ export function loadCSS(href, callback) {
   }
 }
 
+/**
+ * Loads a non module JS file.
+ * @param {string} src URL to the JS file
+ * @param {Object} attrs additional optional attributes
+ */
+
+export async function loadScript(src, attrs) {
+  return new Promise((resolve, reject) => {
+    if (!document.querySelector(`head > script[src="${src}"]`)) {
+      const script = document.createElement('script');
+      script.src = src;
+      if (attrs) {
+      // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const attr in attrs) {
+          script.setAttribute(attr, attrs[attr]);
+        }
+      }
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.append(script);
+    } else {
+      resolve();
+    }
+  });
+}
 /**
  * Retrieves the content of metadata tags.
  * @param {string} name The metadata name (or property)

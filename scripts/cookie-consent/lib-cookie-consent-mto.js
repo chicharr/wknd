@@ -80,9 +80,8 @@ const configureCookieConsent = () => {
   }
 */
   function applyConsent() {
-    //TODO discuss if it's a good idea to use sampleRUM to send event for consent selection
     const { consents } = cc;
-    sampleRUM('consent', {target: consents});
+    Object.entries(consents).forEach(([k, v]) => sampleRUM('consent', { source: k, target: v }));
   }
 
   cc.on('initialized', () => {

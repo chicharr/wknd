@@ -6,29 +6,38 @@ const FILE_PATH = '/drafts/neutrino/martech.json?sheet=default&sheet=adobe&sheet
  * Load the martech configured as non-delayed
  * @param {*} context should contain at lease sampleRUM object and toCamelCase function
  */
-export async function loadMartechLazy(context) {
-  loadMartech((delayed) => delayed && "no" === delayed.toLowerCase(), context);
+export async function loadEager(document, pluginOptions, context) {
+  getNeutrinoConfig(context.toCamelCase).then((nconfig) =>
+    Object.values(nconfig)
+      .filter((v) =>  v.script && !v.script.startsWith('http') && v.earlyInit)
+      .forEach((v) => import(v.script).then((m) => m.eagerInit && m.eagerInit()))
+  );
+}
+
+/**
+ * Load the martech configured as non-delayed
+ * @param {*} context should contain at lease sampleRUM object and toCamelCase function
+ */
+export async function loadLazy(document, pluginOptions, context) {
+  loadMartech((delayed) => delayed && "no" === delayed.toLowerCase(), document, context);
 }
 
 /**
  * Load the martech configured as delayed
  * @param {*} context should contain at lease sampleRUM object and toCamelCase function
  */
-export async function loadMartechDelayed(context) {
-  loadMartech((delayed) => !delayed || "no" !== delayed.toLowerCase(), context);
+export async function loadDelayed(document, pluginOptions, context) {
+  loadMartech((delayed) => !delayed || "no" !== delayed.toLowerCase(), document, context);
 }
 
-async function loadMartech(delayedCondition, {sampleRUM, toCamelCase}) {
+async function loadMartech(delayedCondition, document, {sampleRUM, toCamelCase}) {
   Object.entries(await getNeutrinoConfig(toCamelCase))
-  .filter(([k, v]) => delayedCondition(v.delayed))
-  .forEach( async ([k, v]) => {
+  .filter(([k, v]) => delayedCondition(v.delayed) && v.script)
+  .forEach(([k, v]) => {
     console.log(`Load martech ${k}`);
     const {script} = v;
-    if (!script) {
-      return;
-    }
-    script.startsWith('http') ? loadExternalScript(script, v)
-      : await import(script).then((m) => m.default({sampleRUM, ...v}));
+    script.startsWith('http') ? loadExternalScript(document, script, v)
+      : import(script).then((m) => m.default({sampleRUM, ...v}));
   });
 }
 
@@ -57,7 +66,9 @@ async function getNeutrinoConfig(toCamelCase) {
   return neutrinoConfig;
 }
 
-function parseConfig(data, toCamelCase, env = 'Prod') {
+function parseConfig(data, toCamelCase) {
+  const hn = window.location.hostname;
+  const env = hn === 'localhost' ? 'Dev' : hn.endsWith('.hlx.page') ? 'Page' : 'Live';
   const config = {};
   if (!data) return;
   data.forEach((prop) => {
@@ -66,7 +77,7 @@ function parseConfig(data, toCamelCase, env = 'Prod') {
   return config;
 }
 
-function loadExternalScript (script, config) {
+function loadExternalScript (document, script, config) {
   // TODO replace possible variables in script url
   const scriptElement = document.createElement('script');
   script.src = script;

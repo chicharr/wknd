@@ -10,92 +10,12 @@
  * governing permissions and limitations under the License.
  */
 
-let CUSTOM_SCHEMA_NAMESPACE = "_sitesinternal"
+let CUSTOM_SCHEMA_NAMESPACE;
 
-export default async function initMartech (config) {
-
-  const { sampleRUM,
-         schemaNamespace,
-         edgeConfigId,
-         imsOrgId } = config;
-
-  CUSTOM_SCHEMA_NAMESPACE = schemaNamespace || CUSTOM_SCHEMA_NAMESPACE;
-  initAnalyticsTrackingQueue();
-  setupAnalyticsTrackingWithAlloy(document, edgeConfigId, imsOrgId);
-
-  const cwv = {};
-
-  // Forward the RUM CWV cached measurements to edge using WebSDK before the page unloads
-  sampleRUM.always.on('leave', () => {
-    if (!Object.keys(cwv).length) return;
-    analyticsTrackCWV(cwv);
-  });
-
-  // Listen to changes in consent
-  sampleRUM.always.on('consent', ( {target} ) => {
-    if (target) {
-      analyticsSetConsent(target.ANALYTICS === 'ALLOW');
-    }
-  });
-
-  // Callback to RUM CWV checkpoint in order to cache the measurements
-  sampleRUM.always.on('cwv', async (data) => {
-    if (!data.cwv) return;
-    Object.assign(cwv, data.cwv);
-  });
-
-  sampleRUM.always.on('404', analyticsTrack404);
-  sampleRUM.always.on('error', analyticsTrackError);
-  sampleRUM.always.on('formsubmit', ({element}) => analyticsTrackFormSubmission(element));
-
-  // Declare conversionEvent, bufferTimeoutId and tempConversionEvent,
-  // outside the convert function to persist them for buffering between
-  // subsequent convert calls
-  const CONVERSION_EVENT_TIMEOUT_MS = 100;
-  let bufferTimeoutId;
-  let conversionEvent;
-  let tempConversionEvent;
-  sampleRUM.always.on('convert', (data) => {
-    const { element } = data;
-    // eslint-disable-next-line no-undef
-    if (!element || !alloy) {
-      return;
-    }
-
-    if (element.tagName === 'FORM') {
-      conversionEvent = {
-        ...data,
-        event: 'Form Complete',
-      };
-
-      if (conversionEvent.event === 'Form Complete'
-        // Check for undefined, since target can contain value 0 as well, which is falsy
-        && (data.target === undefined || data.source === undefined)
-      ) {
-        // If a buffer has already been set and tempConversionEvent exists,
-        // merge the two conversionEvent objects to send to alloy
-        if (bufferTimeoutId && tempConversionEvent) {
-          conversionEvent = { ...tempConversionEvent, ...conversionEvent };
-        } else {
-          // Temporarily hold the conversionEvent object until the timeout is complete
-          tempConversionEvent = { ...conversionEvent };
-
-          // If there is partial form conversion data,
-          // set the timeout buffer to wait for additional data
-          bufferTimeoutId = setTimeout(async () => {
-            analyticsTrackConversion({ ...conversionEvent });
-            tempConversionEvent = undefined;
-            conversionEvent = undefined;
-          }, CONVERSION_EVENT_TIMEOUT_MS);
-        }
-      }
-      return;
-    }
-
-    analyticsTrackConversion({ ...data });
-    tempConversionEvent = undefined;
-    conversionEvent = undefined;
-  });
+export async function eagerInit() {
+  console.log('init analytics eager');
+  //Initialize event queue for analytics tracking using alloy
+  createInlineScript(document, document.body, getAlloyInitScript(), 'text/javascript');
 }
 
 /**
@@ -140,7 +60,7 @@ function enhanceAnalyticsEvent(options) {
  * Returns alloy configuration
  * Documentation https://experienceleague.adobe.com/docs/experience-platform/edge/fundamentals/configuring-the-sdk.html
  */
-function getAlloyConfiguration(document, edgeConfigId, imsOrgId) {
+function getAlloyConfiguration(document, edgeConfigId, imsOrgId, defaultConsent = 'pending') {
   const { hostname } = document.location;
 
   return {
@@ -149,8 +69,8 @@ function getAlloyConfiguration(document, edgeConfigId, imsOrgId) {
     // disable when clicks are also tracked via sendEvent with additional details
     clickCollectionEnabled: true,
     // adjust default based on customer use case
-    defaultConsent: 'pending',
-    edgeConfigId: edgeConfigId,
+    defaultConsent,
+    edgeConfigId,
     orgId: imsOrgId,
     onBeforeEventSend: (options) => enhanceAnalyticsEvent(options),
   };
@@ -240,26 +160,19 @@ async function analyticsTrackPageViews(document, additionalXdmFields = {}) {
 }
 
 /**
- * Initializes event queue for analytics tracking using alloy
- * @returns {Promise<void>}
- */
-async function initAnalyticsTrackingQueue() {
-  createInlineScript(document, document.body, getAlloyInitScript(), 'text/javascript');
-}
-
-/**
  * Sets up analytics tracking with alloy (initializes and configures alloy)
  * @param document
  * @returns {Promise<void>}
  */
-export async function setupAnalyticsTrackingWithAlloy(document, edgeConfigId, imsOrgId) {
+async function setupAnalyticsTrackingWithAlloy(document, edgeConfigId, imsOrgId, defaultConsent) {
+  const consent = defaultConsent ? defaultConsent.toLowerCase().trim() : 'pending';
   // eslint-disable-next-line no-undef
   if (!alloy) {
     console.warn('alloy not initialized, cannot configure');
     return;
   }
   // eslint-disable-next-line no-undef
-  const configurePromise = alloy('configure', getAlloyConfiguration(document, edgeConfigId, imsOrgId));
+  const configurePromise = alloy('configure', getAlloyConfiguration(document, edgeConfigId, imsOrgId, consent));
 
   // Custom logic can be inserted here in order to support early tracking before alloy library
   // loads, for e.g. for page views
@@ -463,4 +376,98 @@ async function analyticsTrackVideo({
   }
 
   return sendAnalyticsEvent(baseXdm);
+}
+
+export default async function initMartech(config) {
+  const {
+    sampleRUM,
+    schemaNamespace,
+    edgeConfigId,
+    imsOrgId,
+    defaultConsent,
+  } = config;
+
+  const isValidConfig = () => !!schemaNamespace && !!edgeConfigId && !!imsOrgId;
+
+  if (!isValidConfig()) {
+    console.log("could not load Adobe Analytics martech: incompleteConfiguration");
+    return;
+  }
+
+  CUSTOM_SCHEMA_NAMESPACE = schemaNamespace;
+  setupAnalyticsTrackingWithAlloy(document, edgeConfigId, imsOrgId, defaultConsent);
+
+  const cwv = {};
+
+  // Forward the RUM CWV cached measurements to edge using WebSDK before the page unloads
+  sampleRUM.always.on('leave', () => {
+    if (!Object.keys(cwv).length) return;
+    analyticsTrackCWV(cwv);
+  });
+
+  // Listen to changes in consent
+  sampleRUM.always.on('consent', ({ source, target }) => {
+    if (source === 'ANALYTICS' && target) {
+      analyticsSetConsent(target === 'ALLOW');
+    }
+  });
+
+  // Callback to RUM CWV checkpoint in order to cache the measurements
+  sampleRUM.always.on('cwv', async (data) => {
+    if (!data.cwv) return;
+    Object.assign(cwv, data.cwv);
+  });
+
+  sampleRUM.always.on('404', analyticsTrack404);
+  sampleRUM.always.on('error', analyticsTrackError);
+  sampleRUM.always.on('formsubmit', ({ element }) => analyticsTrackFormSubmission(element));
+
+  // Declare conversionEvent, bufferTimeoutId and tempConversionEvent,
+  // outside the convert function to persist them for buffering between
+  // subsequent convert calls
+  const CONVERSION_EVENT_TIMEOUT_MS = 100;
+  let bufferTimeoutId;
+  let conversionEvent;
+  let tempConversionEvent;
+  sampleRUM.always.on('convert', (data) => {
+    const { element } = data;
+    // eslint-disable-next-line no-undef
+    if (!element || !alloy) {
+      return;
+    }
+
+    if (element.tagName === 'FORM') {
+      conversionEvent = {
+        ...data,
+        event: 'Form Complete',
+      };
+
+      if (conversionEvent.event === 'Form Complete'
+        // Check for undefined, since target can contain value 0 as well, which is falsy
+        && (data.target === undefined || data.source === undefined)
+      ) {
+        // If a buffer has already been set and tempConversionEvent exists,
+        // merge the two conversionEvent objects to send to alloy
+        if (bufferTimeoutId && tempConversionEvent) {
+          conversionEvent = { ...tempConversionEvent, ...conversionEvent };
+        } else {
+          // Temporarily hold the conversionEvent object until the timeout is complete
+          tempConversionEvent = { ...conversionEvent };
+
+          // If there is partial form conversion data,
+          // set the timeout buffer to wait for additional data
+          bufferTimeoutId = setTimeout(async () => {
+            analyticsTrackConversion({ ...conversionEvent });
+            tempConversionEvent = undefined;
+            conversionEvent = undefined;
+          }, CONVERSION_EVENT_TIMEOUT_MS);
+        }
+      }
+      return;
+    }
+
+    analyticsTrackConversion({ ...data });
+    tempConversionEvent = undefined;
+    conversionEvent = undefined;
+  });
 }

@@ -12,13 +12,18 @@ import {
   waitForLCP,
   loadBlocks,
   loadCSS,
-  toClassName,
-  toCamelCase,
+  toClassName
 } from './lib-franklin.js';
 
-import { loadMartechDelayed, loadMartechLazy } from './neutrino.js';
+
+
+
 const LCP_BLOCKS = []; // add your LCP blocks to the list
 window.hlx.RUM_GENERATION = 'project-1'; // add your RUM generation information here
+
+await import('./aem-lib-plugins.js').then((p) => p.init());
+// An generic external plugin
+window.hlx.plugins.add('cwv', '/plugins/mto/index.js');
 
 // Define the custom audiences mapping for experimentation
 const EXPERIMENTATION_CONFIG = {
@@ -181,6 +186,7 @@ async function loadEager(doc) {
   await loadDemoConfig();
 
   const main = doc.querySelector('main');
+  await window.hlx.plugins.run('loadEager');
   if (main) {
     decorateMain(main);
     await waitForLCP(LCP_BLOCKS);
@@ -237,6 +243,8 @@ async function loadLazy(doc) {
   sampleRUM.observe(main.querySelectorAll('div[data-block-name]'));
   sampleRUM.observe(main.querySelectorAll('picture > img'));
 
+  window.hlx.plugins.run('loadLazy');
+
   // Load experimentation preview overlay
   if (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.hlx.page')) {
     const preview = await import(`${window.hlx.codeBasePath}/tools/preview/preview.js`);
@@ -257,7 +265,6 @@ async function loadLazy(doc) {
   // eslint-disable-next-line import/no-relative-packages
   const { initConversionTracking } = await import('../plugins/rum-conversion/src/index.js');
   await initConversionTracking.call(context, document);
-  await loadMartechLazy({sampleRUM, toCamelCase});
 }
 
 /**
@@ -265,16 +272,18 @@ async function loadLazy(doc) {
  * the user experience.
  */
 function loadDelayed() {
-  // eslint-disable-next-line import/no-cycle
-  window.setTimeout(() => { import('./delayed.js');
-   loadMartechDelayed({sampleRUM, toCamelCase}); }, 3000);
-  // load anything that can be postponed to the latest here
+  window.setTimeout(() => {
+    window.hlx.plugins.load('delayed');
+    import('./delayed.js');
+    window.hlx.plugins.run('loadDelayed');
+  }, 3000);
 }
 
 async function loadPage() {
+  await window.hlx.plugins.load('eager');
   await loadEager(document);
+  await window.hlx.plugins.load('lazy');
   await loadLazy(document);
-
   loadDelayed();
 }
 
