@@ -21,7 +21,7 @@ window.hlx.RUM_GENERATION = 'project-1'; // add your RUM generation information 
 // eslint-disable-next-line import/no-relative-packages
 await import('../plugins/system/src/aem-lib-plugins.js').then((p) => p.init());
 // An generic external plugin
-window.hlx.plugins.add('cwv', '/plugins/mto/index.js');
+window.hlx.plugins.add('martech-loader', '/plugins/martech-loader/src/index.js');
 
 // Define the custom audiences mapping for experimentation
 const EXPERIMENTATION_CONFIG = {
