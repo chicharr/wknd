@@ -12,16 +12,14 @@ import {
   waitForLCP,
   loadBlocks,
   loadCSS,
-  toClassName
+  toClassName,
 } from './lib-franklin.js';
-
-
-
 
 const LCP_BLOCKS = []; // add your LCP blocks to the list
 window.hlx.RUM_GENERATION = 'project-1'; // add your RUM generation information here
 
-await import('./aem-lib-plugins.js').then((p) => p.init());
+// eslint-disable-next-line import/no-relative-packages
+await import('../plugins/system/src/aem-lib-plugins.js').then((p) => p.init());
 // An generic external plugin
 window.hlx.plugins.add('cwv', '/plugins/mto/index.js');
 
