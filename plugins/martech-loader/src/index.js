@@ -70,7 +70,7 @@ async function loadMartech(delayedCondition, document, context, pluginOptions) {
       console.log(`Load martech ${k}`);
       loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase('yes'));
       if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
-        webworkerEvents.push(v.webworkerForwardEvents.split(',').map((e) => e.trim()));
+        webworkerEvents.push(...v.webworkerForwardEvents.split(',').map((e) => e.trim()));
       }
       const { script } = v;
       if (script.startsWith('http')) {
