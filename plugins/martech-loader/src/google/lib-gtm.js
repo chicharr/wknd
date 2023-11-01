@@ -22,7 +22,7 @@ export default function loadGTMScript(config) {
       'cookie_flags': 'SameSite=None;Secure'
   });
   `;
-  if (webworker) {
+  if (webworker && webworker.toLowerCase() === 'yes') {
     scriptTag.type = 'text/partytown';
   }
   document.head.prepend(scriptTag);
