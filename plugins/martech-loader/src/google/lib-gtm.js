@@ -1,5 +1,5 @@
-export default function loadGTMScript({ sampleRUM, gtmId }) {
-
+export default function loadGTMScript(config) {
+  const { gtmId, webworker } = config;
   const scriptTag = document.createElement('script');
   scriptTag.innerHTML = `
   // googleTagManager
@@ -22,5 +22,8 @@ export default function loadGTMScript({ sampleRUM, gtmId }) {
       'cookie_flags': 'SameSite=None;Secure'
   });
   `;
+  if (webworker) {
+    scriptTag.type = 'text/partytown';
+  }
   document.head.prepend(scriptTag);
 }

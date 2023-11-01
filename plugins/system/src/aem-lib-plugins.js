@@ -91,6 +91,7 @@ function parsePluginParams(id, config) {
     ? { load: 'eager', url: (config || id).replace(/\/$/, '') }
     : { load: 'eager', ...config };
   pluginConfig.options ||= {};
+  pluginConfig.options.url = pluginConfig.url;
   return { id: toClassName(pluginId), config: pluginConfig };
 }
 

@@ -21,7 +21,9 @@ window.hlx.RUM_GENERATION = 'project-1'; // add your RUM generation information 
 // eslint-disable-next-line import/no-relative-packages
 await import('../plugins/system/src/aem-lib-plugins.js').then((p) => p.init());
 // An generic external plugin
+
 window.hlx.plugins.add('martech-loader', '/plugins/martech-loader/src/index.js');
+window.hlx.plugins.add('rum-conversion', { url: '/plugins/rum-conversion/src/index.js', load: 'lazy' });
 
 // Define the custom audiences mapping for experimentation
 const EXPERIMENTATION_CONFIG = {
@@ -237,7 +239,6 @@ async function loadLazy(doc) {
   }
   addFavIcon(`${window.wknd.demoConfig.demoBase || window.hlx.codeBasePath}/favicon.png`);
   sampleRUM('lazy');
-  sampleRUM.convert('testconversion');
   sampleRUM.observe(main.querySelectorAll('div[data-block-name]'));
   sampleRUM.observe(main.querySelectorAll('picture > img'));
 
@@ -256,13 +257,13 @@ async function loadLazy(doc) {
   // Mark customer as having viewed the page once
   localStorage.setItem('franklin-visitor-returning', true);
 
-  const context = {
+  /*const context = {
     getMetadata,
     toClassName,
-  };
+  };*/
   // eslint-disable-next-line import/no-relative-packages
-  const { initConversionTracking } = await import('../plugins/rum-conversion/src/index.js');
-  await initConversionTracking.call(context, document);
+ // const { initConversionTracking } = await import('../plugins/rum-conversion/src/index.js');
+  // await initConversionTracking.call(context, document);
 }
 
 /**

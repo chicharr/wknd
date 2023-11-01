@@ -1,4 +1,6 @@
-export default async function loadGAScript({ sampleRUM, gaId }) {
+export default async function loadGAScript(config) {
+  const { gaId, webworker } = config;
+
   const scriptGA = document.createElement('script');
   scriptGA.src = `//www.googletagmanager.com/gtag/js?id=${gaId}`;
   document.head.prepend(scriptGA);
@@ -11,5 +13,8 @@ export default async function loadGAScript({ sampleRUM, gaId }) {
   gtag('js', new Date());
   gtag('config', '${gaId}');
 `;
+  if (webworker) {
+    scriptGA.type = 'text/partytown';
+  }
   document.head.prepend(scriptTag);
 }
