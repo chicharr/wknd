@@ -68,7 +68,7 @@ async function loadMartech(delayedCondition, document, context, pluginOptions) {
     .filter(([, v]) => delayedCondition(v.delayed) && v.script)
     .forEach(([k, v]) => {
       console.log(`Load martech ${k}`);
-      loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase('yes'));
+      loadWebworker = !!loadWebworker || (!!v.webworker && v.webworker.toLowerCase('yes'));
       if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
         webworkerEvents.push(...v.webworkerForwardEvents.split(',').map((e) => e.trim()));
       }
