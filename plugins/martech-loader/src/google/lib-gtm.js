@@ -27,3 +27,15 @@ export default function loadGTMScript(config) {
   }
   document.head.prepend(scriptTag);
 }
+
+
+// Listen to changes in consent
+sampleRUM.always.on('consent', ({ source, target }) => {
+  if (source === 'ANALYTICS' && target) {
+    if (window.gtag) {
+      window.gtag('consent', 'update', {
+        analytics_storage: target == 'ALLOW' ? 'granted' : 'denied',
+      });
+    }
+  }
+});
