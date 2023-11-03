@@ -1,5 +1,15 @@
 export default async function loadGAScript(config) {
-  const { gaId, webworker } = config;
+  const { sampleRUM, gaId, webworker } = config;
+  // Listen to changes in consent
+  sampleRUM.always.on('consent', ({ source, target }) => {
+    if (source === 'ANALYTICS' && target) {
+      if (window.gtag) {
+        window.gtag('consent', 'update', {
+          analytics_storage: target == 'ALLOW' ? 'granted' : 'denied',
+        });
+      }
+    }
+  });
 
   const scriptGA = document.createElement('script');
   scriptGA.src = `//www.googletagmanager.com/gtag/js?id=${gaId}`;
