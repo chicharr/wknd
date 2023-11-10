@@ -11,67 +11,34 @@
  * governing permissions and limitations under the License.
  */
 
-/**
- * log RUM if part of the sample.
- * @param {string} checkpoint identifies the checkpoint in funnel
- * @param {Object} data additional data for RUM sample
- */
-export function sampleRUM(checkpoint, data = {}) {
-  sampleRUM.defer = sampleRUM.defer || [];
-  const defer = (fnname) => {
-    sampleRUM[fnname] = sampleRUM[fnname]
-      || ((...args) => sampleRUM.defer.push({ fnname, args }));
-  };
-  sampleRUM.drain = sampleRUM.drain
-    || ((dfnname, fn) => {
-      sampleRUM[dfnname] = fn;
-      sampleRUM.defer
-        .filter(({ fnname }) => dfnname === fnname)
-        .forEach(({ fnname, args }) => sampleRUM[fnname](...args));
-    });
-  sampleRUM.always = sampleRUM.always || [];
-  sampleRUM.always.on = (chkpnt, fn) => { sampleRUM.always[chkpnt] = fn; };
-  sampleRUM.on = (chkpnt, fn) => { sampleRUM.cases[chkpnt] = fn; };
-  defer('observe');
-  defer('cwv');
+export function sampleRUM(checkpoint, data) {
+  const SESSION_STORAGE_KEY = 'aem-rum';
   try {
     window.hlx = window.hlx || {};
     if (!window.hlx.rum) {
-      const usp = new URLSearchParams(window.location.search);
-      const weight = (usp.get('rum') === 'on') ? 1 : 100; // with parameter, weight is 1. Defaults to 100.
-      // eslint-disable-next-line no-bitwise
-      const hashCode = (s) => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
-      const id = `${hashCode(window.location.href)}-${new Date().getTime()}-${Math.random().toString(16).substr(2, 14)}`;
-      const random = Math.random();
-      const isSelected = (random * weight < 1);
-      // eslint-disable-next-line object-curly-newline
-      window.hlx.rum = { weight, id, random, isSelected, sampleRUM };
+      // eslint-disable-next-line max-len
+      const rumStorage = sessionStorage.getItem(SESSION_STORAGE_KEY) ? JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY)) : {};
+      rumStorage.pages = (rumStorage.pages ?? 0) + (Math.floor(Math.random() * 20) - 10) + 1;
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(rumStorage));
+      sampleRUM.baseURL = sampleRUM.baseURL || new URL(window.RUM_BASE == null ? 'https://rum.hlx.page' : window.RUM_BASE, window.location);
+      const weight = new URLSearchParams(window.location.search).get('rum') === 'on' ? 1 : 100;
+      const id = Array.from({ length: 75 }, (_, i) => String.fromCharCode(48 + i)).filter((a) => /\d|[A-Z]/i.test(a)).filter(() => Math.random() * 75 > 70).join('');
+      const isSelected = (Math.random() * weight < 1);
+      // eslint-disable-next-line object-curly-newline, max-len
+      window.hlx.rum = { weight, id, isSelected, firstReadTime: Date.now(), sampleRUM, queue: [], collector: (...args) => window.hlx.rum.queue.push(args) };
+      if (isSelected) {
+        // eslint-disable-next-line object-curly-newline, max-len
+        const body = JSON.stringify({ weight, id, referer: window.location.href, checkpoint: 'top', t: 0 });
+        const url = new URL(`.rum/${weight}`, sampleRUM.baseURL).href;
+        console.debug(`ping:top`);
+        //navigator.sendBeacon(url, body);
+        window.setTimeout(() => import('./enhancer.js'), 200); // enhancer should come from .rum domain //wait 1'5 secs LCP should be ready by then
+      }
     }
-    const { weight, id } = window.hlx.rum;
-    if (window.hlx && window.hlx.rum && window.hlx.rum.isSelected) {
-      const sendPing = (pdata = data) => {
-        // eslint-disable-next-line object-curly-newline, max-len, no-use-before-define
-        const body = JSON.stringify({ weight, id, referer: window.location.href, generation: window.hlx.RUM_GENERATION, checkpoint, ...data });
-        const url = `https://rum.hlx.page/.rum/${weight}`;
-        // eslint-disable-next-line no-unused-expressions
-        navigator.sendBeacon(url, body);
-        // eslint-disable-next-line no-console
-        console.debug(`ping:${checkpoint}`, pdata);
-      };
-      sampleRUM.cases = sampleRUM.cases || {
-        cwv: () => sampleRUM.cwv(data) || true,
-        lazy: () => {
-          // use classic script to avoid CORS issues
-          const script = document.createElement('script');
-          script.src = 'https://rum.hlx.page/.rum/@adobe/helix-rum-enhancer@^1/src/index.js';
-          document.head.appendChild(script);
-          return true;
-        },
-      };
-      sendPing(data);
-      if (sampleRUM.cases[checkpoint]) { sampleRUM.cases[checkpoint](); }
+    if (window.hlx.rum && window.hlx.rum.isSelected && checkpoint) {
+      window.hlx.rum.collector(checkpoint, data, Date.now() - window.hlx.rum.firstReadTime);
     }
-    if (sampleRUM.always[checkpoint]) { sampleRUM.always[checkpoint](data); }
+    document.dispatchEvent(new CustomEvent('rum', { checkpoint, data }));
   } catch (error) {
     // something went wrong
   }
@@ -782,7 +749,7 @@ export function setup() {
  */
 function init() {
   setup();
-  sampleRUM('top');
+  sampleRUM();
 
   window.addEventListener('load', () => sampleRUM('load'));
 

@@ -241,9 +241,6 @@ async function loadLazy(doc) {
     loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   }
   addFavIcon(`${window.wknd.demoConfig.demoBase || window.hlx.codeBasePath}/favicon.png`);
-  sampleRUM('lazy');
-  sampleRUM.observe(main.querySelectorAll('div[data-block-name]'));
-  sampleRUM.observe(main.querySelectorAll('picture > img'));
 
   // Mark customer as having viewed the page once
   localStorage.setItem('franklin-visitor-returning', true);
@@ -283,7 +280,7 @@ window.addEventListener('beforeunload', () => {
   analyticsTrackCWV(cwv);
 });
 
-// Callback to RUM CWV checkpoint in order to cache the measurements
+/* Callback to RUM CWV checkpoint in order to cache the measurements
 sampleRUM.always.on('cwv', async (data) => {
   if (!data.cwv) return;
   Object.assign(cwv, data.cwv);
@@ -291,7 +288,7 @@ sampleRUM.always.on('cwv', async (data) => {
 
 sampleRUM.always.on('404', analyticsTrack404);
 sampleRUM.always.on('error', analyticsTrackError);
-
+*/
 // Declare conversionEvent, bufferTimeoutId and tempConversionEvent,
 // outside the convert function to persist them for buffering between
 // subsequent convert calls
@@ -299,7 +296,8 @@ const CONVERSION_EVENT_TIMEOUT_MS = 100;
 let bufferTimeoutId;
 let conversionEvent;
 let tempConversionEvent;
-sampleRUM.always.on('convert', (data) => {
+/*
+ sampleRUM.always.on('convert', (data) => {
   const { element } = data;
   // eslint-disable-next-line no-undef
   if (!element || !alloy) {
@@ -339,6 +337,6 @@ sampleRUM.always.on('convert', (data) => {
   analyticsTrackConversion({ ...data });
   tempConversionEvent = undefined;
   conversionEvent = undefined;
-});
+}); */
 
 loadPage();

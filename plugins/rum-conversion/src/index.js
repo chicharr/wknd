@@ -17,7 +17,7 @@ const { sampleRUM } = window.hlx.rum;
 * The function will register a listener for an element if listenTo parameter is provided.
 * listenTo supports 'submit' and 'click'.
 * If listenTo is not provided, the information is used to track a conversion event.
-*/
+
 sampleRUM.drain('convert', (cevent, cvalueThunk, element, listenTo = []) => {
   async function trackConversion(celement) {
     const MAX_SESSION_LENGTH = 1000 * 60 * 60 * 24 * 30; // 30 days
@@ -66,7 +66,7 @@ sampleRUM.drain('convert', (cevent, cvalueThunk, element, listenTo = []) => {
     trackConversion(element, cevent, cvalueThunk);
   }
 });
-
+*/
 /**
  * Returns the label used for tracking link clicks
  * @param {Element} element link element
@@ -109,7 +109,7 @@ function findConversionValue(parent, fieldName) {
  */
 // eslint-disable-next-line import/prefer-default-export
 export async function initConversionTracking(parent = document, defaultFormConversionName = '') {
-  const conversionElements = {
+/*  const conversionElements = {
     form: () => {
       // Track all forms
       parent.querySelectorAll('form').forEach((element) => {
@@ -165,5 +165,5 @@ export async function initConversionTracking(parent = document, defaultFormConve
 
   Object.keys(conversionElements)
     .filter((ce) => declaredConversionElements.includes(ce))
-    .forEach((cefn) => conversionElements[cefn]());
+    .forEach((cefn) => conversionElements[cefn]()); */
 }
