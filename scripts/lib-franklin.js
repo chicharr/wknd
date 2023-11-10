@@ -30,8 +30,8 @@ export function sampleRUM(checkpoint, data) {
         // eslint-disable-next-line object-curly-newline, max-len
         const body = JSON.stringify({ weight, id, referer: window.location.href, checkpoint: 'top', t: 0 });
         const url = new URL(`.rum/${weight}`, sampleRUM.baseURL).href;
-        console.debug(`ping:top`);
-        //navigator.sendBeacon(url, body);
+        console.debug('ping:top');
+        navigator.sendBeacon(url, body);
         window.setTimeout(() => import('./enhancer.js'), 200); // enhancer should come from .rum domain //wait 1'5 secs LCP should be ready by then
       }
     }

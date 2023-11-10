@@ -79,7 +79,7 @@ function trackCheckpoint(checkpoint, data, t) {
       // eslint-disable-next-line object-curly-newline, max-len
       const body = JSON.stringify({ weight, id, sanitizeURL: urlSanitizers[window.hlx.RUM_MASK_URL || 'path'], checkpoint, t, ...data }, KNOWN_PROPERTIES);
       const url = new URL(`.rum/${weight}`, sampleRUM.baseURL).href;
-//      navigator.sendBeacon(url, body);
+      navigator.sendBeacon(url, body);
       // eslint-disable-next-line no-console
       console.debug(`ping:${checkpoint}`, pdata);
     };
