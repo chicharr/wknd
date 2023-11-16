@@ -11,7 +11,7 @@
  */
 /* eslint-env browser */
 const KNOWN_PROPERTIES = ['weight', 'id', 'referer', 'checkpoint', 't', 'source', 'target', 'cwv', 'CLS', 'FID', 'LCP', 'INP', 'TTFB'];
-const DEFAULT_CHECKPOINTS = ['click', 'cwv', 'form', 'enterleave', 'observeblock', 'observemedia'];
+const DEFAULT_CHECKPOINTS = ['click', 'cwv', 'form', 'enterleave', 'viewblock', 'viewmedia'];
 const SESSION_STORAGE_KEY = 'aem-rum';
 const { sampleRUM, queue, isSelected } = window.hlx.rum;
 
@@ -22,8 +22,8 @@ const urlSanitizers = {
 };
 
 const targetselector = (element) => {
-  let value = element.getAttribute('href') || element.currentSrc || element.getAttribute('src')
-                || element.dataset.action || element.action;
+  let value = element.getAttribute('data-rum-target') || element.getAttribute('href')
+    || element.currentSrc || element.getAttribute('src') || element.dataset.action || element.action;
   if (value && value.startsWith('https://')) {
     // resolve relative links
     value = new URL(value, window.location).href;
@@ -35,7 +35,9 @@ const sourceselector = (element) => {
   if (element === document.body || element === document.documentElement || !element) {
     return undefined;
   }
-
+  if (element.getAttribute('data-rum-source')) {
+    return element.getAttribute('data-rum-source');
+  }
   const form = element.closest('form');
   let formElementSelector = '';
   if (form && Array.from(form.elements).includes(element)) {
@@ -127,6 +129,14 @@ function addEnterLeaveTracking() {
   if (!!document.referrer && (document.referrer !== window.location.href)) {
     sampleRUM('enter', { target: undefined, source: document.referrer });
   }
+  const entries = performance.getEntriesByType('navigation');
+  entries.forEach((entry) => {
+    if (entry.type === 'navigate') {
+      console.log(`${entry.name} was navigated!`);
+      console.log(entry);
+    }
+  });
+
   const leave = ((event) => {
     if (leave.left || (event.type === 'visibilitychange' && document.visibilityState !== 'hidden')) {
       return;
@@ -165,38 +175,39 @@ function activateBlocksMutationObserver() {
   );
 }
 
-function addViewBlockTracking(element) {
+function getIntersectionObsever(checkpoint) {
+  if (!window.IntersectionObserver) {
+    return null;
+  }
   activateBlocksMutationObserver();
-  if (window.IntersectionObserver) {
-    const blockobserver = new IntersectionObserver((entries) => {
-      entries
-        .filter((entry) => entry.isIntersecting)
-        .forEach((entry) => {
-          blockobserver.unobserve(entry.target); // observe only once
-          const target = targetselector(entry.target);
-          const source = sourceselector(entry.target);
-          sampleRUM('viewblock', { target, source });
-        });
-    }, { threshold: 0.25 });
+  const observer = new IntersectionObserver((entries) => {
+    entries
+      .filter((entry) => entry.isIntersecting)
+      .forEach((entry) => {
+        observer.unobserve(entry.target); // observe only once
+        const target = targetselector(entry.target);
+        const source = sourceselector(entry.target);
+        sampleRUM(checkpoint, { target, source });
+      });
+  }, { threshold: 0.25 });
+  return observer;
+}
+function addViewBlockTracking(element) {
+  const blockobserver = getIntersectionObsever('viewblock');
+  if (blockobserver) {
     const blocks = element.getAttribute('data-block-status') ? [element] : element.querySelectorAll('div[data-block-status="loaded"]');
     blocks.forEach((b) => blockobserver.observe(b));
   }
 }
 
 function addViewMediaTracking(parent) {
-  activateBlocksMutationObserver();
-  if (window.IntersectionObserver) {
-    const mediaobserver = new IntersectionObserver((entries) => {
-      entries
-        .filter((entry) => entry.isIntersecting)
-        .forEach((entry) => {
-          mediaobserver.unobserve(entry.target); // observe only once
-          const target = targetselector(entry.target);
-          const source = sourceselector(entry.target);
-          sampleRUM('viewmedia', { target, source });
-        });
-    }, { threshold: 0.25 });
-    parent.querySelectorAll('picture > img').forEach((m) => mediaobserver.observe(m));
+  const mediaobserver = getIntersectionObsever('viewmedia');
+  if (mediaobserver) {
+    parent.querySelectorAll('picture > img, video, audio, iframe').forEach((m) => {
+      if (!m.closest('div .block') || m.closest('div[data-block-status="loaded"]')) {
+        mediaobserver.observe(m);
+      }
+    });
   }
 }
 
@@ -210,13 +221,12 @@ function addFormTracking(parent) {
 
 function mutationsCallback(mutations) {
   const addObserver = (ck, fn, block) => getCollectionConfig().includes(ck) && fn(block);
-  mutations.filter((m) => m.type === 'attributes')
-    .filter((m) => m.attributeName === 'data-block-status')
+  mutations.filter((m) => m.type === 'attributes' && m.attributeName === 'data-block-status')
     .filter((m) => m.target.dataset.blockStatus === 'loaded')
     .forEach((m) => {
       addObserver('form', addFormTracking, m.target);
-      addObserver('observeblock', addViewBlockTracking, m.target);
-      addObserver('observemedia', addViewMediaTracking, m.target);
+      addObserver('viewblock', addViewBlockTracking, m.target);
+      addObserver('viewmedia', addViewMediaTracking, m.target);
     });
 }
 
@@ -231,8 +241,8 @@ function addTrackingFromConfig() {
     form: () => addFormTracking(window.document.body),
     enterleave: () => addEnterLeaveTracking(),
     loadresource: () => addLoadResourceTracking(),
-    observeblock: () => addViewBlockTracking(window.document.body),
-    observemedia: () => addViewMediaTracking(window.document.body),
+    viewblock: () => addViewBlockTracking(window.document.body),
+    viewmedia: () => addViewMediaTracking(window.document.body),
   };
 
   getCollectionConfig().filter((ck) => trackingFunctions[ck])

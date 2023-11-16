@@ -25,18 +25,18 @@ export function sampleRUM(checkpoint, data) {
       const id = Array.from({ length: 75 }, (_, i) => String.fromCharCode(48 + i)).filter((a) => /\d|[A-Z]/i.test(a)).filter(() => Math.random() * 75 > 70).join('');
       const isSelected = (Math.random() * weight < 1);
       // eslint-disable-next-line object-curly-newline, max-len
-      window.hlx.rum = { weight, id, isSelected, firstReadTime: Date.now(), sampleRUM, queue: [], collector: (...args) => window.hlx.rum.queue.push(args) };
+      window.hlx.rum = { weight, id, isSelected, firstReadTime: window.performance ? window.performance.timeOrigin : Date.now(), sampleRUM, queue: [], collector: (...args) => window.hlx.rum.queue.push(args) };
       if (isSelected) {
         // eslint-disable-next-line object-curly-newline, max-len
-        const body = JSON.stringify({ weight, id, referer: window.location.href, checkpoint: 'top', t: 0 });
+        const body = JSON.stringify({ weight, id, referer: window.location.href, checkpoint: 'top', t: 0, target: document.visibilityState });
         const url = new URL(`.rum/${weight}`, sampleRUM.baseURL).href;
-        console.debug('ping:top');
         navigator.sendBeacon(url, body);
-        window.setTimeout(() => import('./enhancer.js'), 200); // enhancer should come from .rum domain //wait 1'5 secs LCP should be ready by then
+        window.addEventListener('load', import('./enhancer.js'));
       }
     }
     if (window.hlx.rum && window.hlx.rum.isSelected && checkpoint) {
-      window.hlx.rum.collector(checkpoint, data, Date.now() - window.hlx.rum.firstReadTime);
+      // eslint-disable-next-line object-curly-newline, max-len
+      window.hlx.rum.collector(checkpoint, data, window.performance ? window.performance.now() : Date.now() - window.hlx.rum.firstReadTime);
     }
     document.dispatchEvent(new CustomEvent('rum', { checkpoint, data }));
   } catch (error) {
