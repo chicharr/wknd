@@ -126,16 +126,24 @@ function addCWVTracking() {
 
 function addEnterLeaveTracking() {
   // enter checkpoint when referrer is not the current page url
-  if (!!document.referrer && (document.referrer !== window.location.href)) {
-    sampleRUM('enter', { target: undefined, source: document.referrer });
-  }
-  const entries = performance.getEntriesByType('navigation');
-  entries.forEach((entry) => {
-    if (entry.type === 'navigate') {
-      console.log(`${entry.name} was navigated!`);
-      console.log(entry);
+  const navigate = (source, type) => {
+    const payload = { source, target: document.visibilityState };
+    // reload: same page, navigate: same origin, enter: everything else
+    if (type === 'reload' || source === window.location.href) {
+      sampleRUM('reload', payload);
+    } else if (type !== 'navigate') {
+      sampleRUM(type, payload); // back, forward, prerender, etc.
+    } else if (source && window.location.origin === new URL(source).origin) {
+      sampleRUM('navigate', payload); // internal navigation
+    } else {
+      sampleRUM('enter', payload); // enter site
     }
-  });
+  };
+  navigate(document.referrer);
+
+  new PerformanceObserver((list) => list
+    .getEntries().map((entry) => navigate(document.referrer, entry.type)))
+    .observe({ type: 'navigation', buffered: true });
 
   const leave = ((event) => {
     if (leave.left || (event.type === 'visibilitychange' && document.visibilityState !== 'hidden')) {
@@ -219,8 +227,8 @@ function addFormTracking(parent) {
   });
 }
 
+const addObserver = (ck, fn, block) => getCollectionConfig().includes(ck) && fn(block);
 function mutationsCallback(mutations) {
-  const addObserver = (ck, fn, block) => getCollectionConfig().includes(ck) && fn(block);
   mutations.filter((m) => m.type === 'attributes' && m.attributeName === 'data-block-status')
     .filter((m) => m.target.dataset.blockStatus === 'loaded')
     .forEach((m) => {
