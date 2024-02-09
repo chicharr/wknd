@@ -85,17 +85,17 @@ function consentUpdated(document, context, pluginOptions) {
   pendingConsentMartech = [];
   let loadWebworker = false;
   pendingArray.filter(({key, config}) => isConsented(key, config))
-    .forEach(({k, v}) => {
-      console.log(`[martech-loader] Load martech ${k}`);
-      loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase()==='yes');
-      if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
-        webworkerEvents.push(...v.webworkerForwardEvents.split(',').map((e) => e.trim()));
+    .forEach(({key, config}) => {
+      console.log(`[martech-loader] Load martech ${key}`);
+      loadWebworker = loadWebworker || (config.webworker && config.webworker.toLowerCase()==='yes');
+      if (config.webworker && config.webworker.toLowerCase('yes') && config.webworkerForwardEvents) {
+        webworkerEvents.push(...config.webworkerForwardEvents.split(',').map((e) => e.trim()));
       }
-      const { script } = v;
+      const { script } = config;
       if (script.startsWith('http')) {
-        loadExternalScript(document, script, v);
+        loadExternalScript(document, script, config);
       } else {
-        import(script).then((m) => m.default({ sampleRUM, getPlaceholderOrDefault, ...v }));
+        import(script).then((m) => m.default({ sampleRUM, getPlaceholderOrDefault, ...config }));
       }
     });
   if (loadWebworker) {
