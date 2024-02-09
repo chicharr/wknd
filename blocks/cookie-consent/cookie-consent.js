@@ -31,7 +31,7 @@ function manageConsentUpdate(selCategories) {
   setStoredPreference(newCategories);
   sampleRUM('consentupdate', newCategories);
   const consentUpdateEvent = new CustomEvent('consent-updated', newCategories);
-  dispatchEvent(consentUpdateEvent);
+  document.dispatchEvent(consentUpdateEvent);
 }
 
 function manageConsentRead(categories) {
@@ -40,7 +40,7 @@ function manageConsentRead(categories) {
   window.hlx.consent.categories = categories;
   sampleRUM('consent', categories);
   const consentReadEvent = new CustomEvent('consent', categories);
-  dispatchEvent(consentReadEvent);
+  document.dispatchEvent(consentReadEvent);
 }
 
 export default function decorate(block) {
