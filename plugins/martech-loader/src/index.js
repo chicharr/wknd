@@ -65,12 +65,14 @@ function isConsented(name, config) {
   const consentedCategories = window.hlx && window.hlx.consent ? window.hlx.consentCategories : '';
   const isConsented = (!consentedCategories || !config.consentCategory || consentedCategories.includes(config.consentCategory));
   if (!isConsented) {
+    console.log(`[martech-loader] prevent load martech ${name} -> not consented`);
     pendingConsentMartech.push({name, config});
   }
   return isConsented;
 }
 
 function consentUpdated(document, context, pluginOptions) {
+  console.log(`[martech-loader] consent updated: ${window.hlx.consent.categories}`);
   if (!pendingConsentMartech || !pendingConsentMartech.length) {
     return;
   }
@@ -81,7 +83,7 @@ function consentUpdated(document, context, pluginOptions) {
   let loadWebworker = false;
   pendingArray.filter(([k,v]) => isConsented(k, v))
     .forEach(([k, v]) => {
-      console.log(`Load martech ${k}`);
+      console.log(`[martech-loader] Load martech ${k}`);
       loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase()==='yes');
       if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
         webworkerEvents.push(...v.webworkerForwardEvents.split(',').map((e) => e.trim()));
@@ -98,8 +100,6 @@ function consentUpdated(document, context, pluginOptions) {
   }
 }
 
-
-
 async function loadMartech(delayedCondition, document, context, pluginOptions) {
   const { sampleRUM, toCamelCase, getPlaceholderOrDefault } = context;
   const webworkerEvents = [];
@@ -108,7 +108,7 @@ async function loadMartech(delayedCondition, document, context, pluginOptions) {
     .filter(([, v]) => delayedCondition(v.delayed) && v.script)
     .filter(([k, v]) => isConsented(k, v))
     .forEach(([k, v]) => {
-      console.log(`Load martech ${k}`);
+      console.log(`[martech-loader] Load martech ${k}`);
       loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase()==='yes');
       if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
         webworkerEvents.push(...v.webworkerForwardEvents.split(',').map((e) => e.trim()));
