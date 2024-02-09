@@ -62,8 +62,9 @@ function initPartytown(forwardedEvents, pluginOptions) {
 }
 
 function isConsented(name, config) {
-  const consentedCategories = window.hlx && window.hlx.consent ? window.hlx.consent.categories : '';
-  const isConsented = (!consentedCategories || !config.consentCategory || consentedCategories.includes(config.consentCategory));
+  const consentEnabled = window.hlx && window.hlx.consent;
+  const consentedCategories = consentEnabled ? window.hlx.consent.categories : [];
+  const isConsented = (!consentEnabled || !config.consentCategory || consentedCategories.includes(config.consentCategory));
   if (!isConsented) {
     console.log(`[martech-loader] prevent load martech ${name} -> not consented`);
     pendingConsentMartech.push({name, config});
