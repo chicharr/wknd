@@ -25,6 +25,22 @@ await import('../plugins/system/src/aem-lib-plugins.js').then((p) => p.init());
 window.hlx.plugins.add('martech-loader', '/plugins/martech-loader/src/index.js');
 window.hlx.plugins.add('rum-conversion', { url: '/plugins/rum-conversion/src/index.js', load: 'lazy' });
 
+function buildCookieConsent(main) {
+  const ccPath = getMetadata('cookie-consent');
+  if (!ccPath || (window.hlx && window.hlx.consent)) {
+    // consent not configured for page or already initialized
+    return;
+  }
+  window.hlx = window.hlx || [];
+  window.hlx.consent = { status: 'pending' };
+  const blockHTML = `<div>${ccPath}</div>`;
+  const section = document.createElement('div');
+  const ccBlock = document.createElement('div');
+  ccBlock.innerHTML = blockHTML;
+  section.append(buildBlock('cookie-consent', ccBlock));
+  main.append(section);
+}
+
 // Define the custom audiences mapping for experimentation
 const EXPERIMENTATION_CONFIG = {
   audiences: {
@@ -93,6 +109,7 @@ function buildHeroBlock(main) {
 function buildAutoBlocks(main) {
   try {
     buildHeroBlock(main);
+    buildCookieConsent(main);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);

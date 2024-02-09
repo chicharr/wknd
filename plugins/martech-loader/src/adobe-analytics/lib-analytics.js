@@ -405,13 +405,13 @@ export default async function initMartech(config) {
     analyticsTrackCWV(cwv);
   });
 
-  // Listen to changes in consent
+/*  // Listen to changes in consent
   sampleRUM.always.on('consent', ({ source, target }) => {
     if (source === 'ANALYTICS' && target) {
       analyticsSetConsent(target === 'ALLOW');
     }
   });
-
+*/
   // Callback to RUM CWV checkpoint in order to cache the measurements
   sampleRUM.always.on('cwv', async (data) => {
     if (!data.cwv) return;

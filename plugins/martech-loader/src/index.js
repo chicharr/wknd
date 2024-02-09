@@ -1,6 +1,6 @@
 // TODO path to the config file
 // TODO we shouldn't need to specify the sheets that we want to retrieve
-const FILE_PATH = '/drafts/neutrino/martech.json?sheet=default&sheet=adobe&sheet=consent&sheet=google';
+const FILE_PATH = '/drafts/neutrino/martech.json?sheet=default&sheet=adobeanalytics&sheet=google&sheet=adobelaunch';
 
 function parseConfig(data, toCamelCase) {
   let env = 'Live';
@@ -18,6 +18,7 @@ function parseConfig(data, toCamelCase) {
   return config;
 }
 
+let pendingConsentMartech = [];
 // keep the config of neutrino in a var to avoid loading and parsing the info twice
 let neutrinoConfig;
 async function getNeutrinoConfig(toCamelCase) {
@@ -60,12 +61,52 @@ function initPartytown(forwardedEvents, pluginOptions) {
   import('./partytown/partytown.js');
 }
 
+function isConsented(name, config) {
+  const consentedCategories = window.hlx && window.hlx.consent ? window.hlx.consentCategories : '';
+  const isConsented = (!consentedCategories || !config.consentCategory || consentedCategories.includes(config.consentCategory));
+  if (!isConsented) {
+    pendingConsentMartech.push({name, config});
+  }
+  return isConsented;
+}
+
+function consentUpdated(document, context, pluginOptions) {
+  if (!pendingConsentMartech || !pendingConsentMartech.length) {
+    return;
+  }
+  const { sampleRUM, toCamelCase, getPlaceholderOrDefault } = context;
+  const webworkerEvents = [];
+  const pendingArray = new Array(...pendingConsentMartech);
+  pendingConsentMartech = [];
+  let loadWebworker = false;
+  pendingArray.filter(([k,v]) => isConsented(k, v))
+    .forEach(([k, v]) => {
+      console.log(`Load martech ${k}`);
+      loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase()==='yes');
+      if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
+        webworkerEvents.push(...v.webworkerForwardEvents.split(',').map((e) => e.trim()));
+      }
+      const { script } = v;
+      if (script.startsWith('http')) {
+        loadExternalScript(document, script, v);
+      } else {
+        import(script).then((m) => m.default({ sampleRUM, getPlaceholderOrDefault, ...v }));
+      }
+    });
+  if (loadWebworker) {
+    initPartytown(webworkerEvents, pluginOptions);
+  }
+}
+
+
+
 async function loadMartech(delayedCondition, document, context, pluginOptions) {
   const { sampleRUM, toCamelCase, getPlaceholderOrDefault } = context;
   const webworkerEvents = [];
   let loadWebworker = false;
   Object.entries(await getNeutrinoConfig(toCamelCase))
     .filter(([, v]) => delayedCondition(v.delayed) && v.script)
+    .filter(([k, v]) => isConsented(k, v))
     .forEach(([k, v]) => {
       console.log(`Load martech ${k}`);
       loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase()==='yes');
@@ -89,6 +130,8 @@ async function loadMartech(delayedCondition, document, context, pluginOptions) {
  * @param {*} context should contain at lease sampleRUM object and toCamelCase function
  */
 export async function loadEager(document, pluginOptions, context) {
+  document.addEventListener('consent-updated', () => consentUpdated(document, context, pluginOptions));
+  document.addEventListener('consent', () => consentUpdated(document, context, pluginOptions));
   getNeutrinoConfig(context.toCamelCase).then((nconfig) => Object.values(nconfig)
     .filter((v) => v.script && !v.script.startsWith('http') && v.earlyInit)
     .forEach((v) => import(v.script).then((m) => m.eagerInit && m.eagerInit())));
