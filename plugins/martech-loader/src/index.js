@@ -61,15 +61,15 @@ function initPartytown(forwardedEvents, pluginOptions) {
   import('./partytown/partytown.js');
 }
 
-function isConsented(name, config) {
+function isConsented(key, config) {
   const consentEnabled = !!(window.hlx && window.hlx.consent);
   const consentedCategories = consentEnabled ? window.hlx.consent.categories : [];
   const isConsented = !consentEnabled ||
      !config.consentCategory ||
      (consentedCategories && consentedCategories.includes(config.consentCategory));
   if (!isConsented) {
-    console.log(`[martech-loader] prevent load martech ${name} -> not consented`);
-    pendingConsentMartech.push({name, config});
+    console.log(`[martech-loader] prevent load martech ${key} -> not consented`);
+    pendingConsentMartech.push({key, config});
   }
   return isConsented;
 }
@@ -84,8 +84,8 @@ function consentUpdated(document, context, pluginOptions) {
   const pendingArray = new Array(...pendingConsentMartech);
   pendingConsentMartech = [];
   let loadWebworker = false;
-  pendingArray.filter(([k,v]) => isConsented(k, v))
-    .forEach(([k, v]) => {
+  pendingArray.filter(({key, config}) => isConsented(key, config))
+    .forEach(({k, v}) => {
       console.log(`[martech-loader] Load martech ${k}`);
       loadWebworker = loadWebworker || (v.webworker && v.webworker.toLowerCase()==='yes');
       if (v.webworker && v.webworker.toLowerCase('yes') && v.webworkerForwardEvents) {
