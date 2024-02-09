@@ -133,7 +133,7 @@ async function loadMartech(delayedCondition, document, context, pluginOptions) {
  * @param {*} context should contain at lease sampleRUM object and toCamelCase function
  */
 export async function loadEager(document, pluginOptions, context) {
-  document.addEventListener('consent-updated', () => consentUpdated(document, context, pluginOptions));
+  document.addEventListener('consent-updated', () => { console.log('[martech-loader] consent-updated');consentUpdated(document, context, pluginOptions);});
   document.addEventListener('consent', () => consentUpdated(document, context, pluginOptions));
   getNeutrinoConfig(context.toCamelCase).then((nconfig) => Object.values(nconfig)
     .filter((v) => v.script && !v.script.startsWith('http') && v.earlyInit)
